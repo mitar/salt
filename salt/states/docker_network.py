@@ -731,8 +731,14 @@ def present(
                 # configuration.
                 network["IPAM"]["Config"] = []
 
+            # ``Status`` was added to docker network inspect output in
+            # Docker 24 / API v1.44 and contains live runtime data (per-subnet
+            # IPs in use, dynamic IPs available, etc.). It is not part of the
+            # network configuration and will always differ between the
+            # existing network and the freshly created temp network, so it
+            # must be ignored when deciding whether to recreate.
             changes = __salt__["docker.compare_networks"](
-                network, temp_net_info, ignore="Name,Id,Created,Containers"
+                network, temp_net_info, ignore="Name,Id,Created,Containers,Status"
             )
 
             if not changes:
