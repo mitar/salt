@@ -695,29 +695,40 @@ def present(
             desired_pool_count = len(temp_net_info["IPAM"]["Config"])
 
             def is_default_pool(x):
-                return True if sorted(x) == ["Gateway", "Subnet"] else False
+                # A pool is a "default" (auto-assigned) pool if it has only
+                # a Subnet and Gateway set. Docker's inspect output can
+                # include additional keys such as ``IPRange`` or
+                # ``AuxiliaryAddresses`` with empty values; those are not
+                # user-configured settings and must not disqualify the pool
+                # from being treated as default.
+                non_empty_keys = sorted(k for k, v in x.items() if v)
+                return non_empty_keys == ["Gateway", "Subnet"]
 
             if (
                 desired_pool_count == 0
-                and existing_pool_count == 1
-                and is_default_pool(network["IPAM"]["Config"][0])
+                and existing_pool_count >= 1
+                and all(
+                    is_default_pool(pool) for pool in network["IPAM"]["Config"]
+                )
             ):
                 # If we're not explicitly configuring an IPAM pool, then we
                 # don't care what the subnet is. Docker networks created with
-                # no explicit IPAM configuration are assigned a single IPAM
-                # pool containing just a subnet and gateway. If the above if
-                # statement resolves as True, then we know that both A) we
-                # aren't explicitly configuring IPAM, and B) the existing
-                # network appears to be one that was created without an
-                # explicit IPAM configuration (since it has the default pool
-                # config values). Of course, it could be possible that the
-                # existing network was created with a single custom IPAM pool,
-                # with just a subnet and gateway. But even if this was the
-                # case, the fact that we aren't explicitly enforcing IPAM
-                # configuration means we don't really care what the existing
-                # IPAM configuration is. At any rate, to avoid IPAM differences
-                # when comparing the existing network to the temp network, we
-                # need to clear the existing network's IPAM configuration.
+                # no explicit IPAM configuration are assigned a default IPAM
+                # pool containing just a subnet and gateway (one pool for IPv4
+                # and, when ``enable_ipv6`` is true, an additional pool for
+                # IPv6). If the above if statement resolves as True, then we
+                # know that both A) we aren't explicitly configuring IPAM, and
+                # B) the existing network appears to be one that was created
+                # without an explicit IPAM configuration (since every pool has
+                # the default pool config values). Of course, it could be
+                # possible that the existing network was created with custom
+                # IPAM pools, with just a subnet and gateway. But even if this
+                # was the case, the fact that we aren't explicitly enforcing
+                # IPAM configuration means we don't really care what the
+                # existing IPAM configuration is. At any rate, to avoid IPAM
+                # differences when comparing the existing network to the temp
+                # network, we need to clear the existing network's IPAM
+                # configuration.
                 network["IPAM"]["Config"] = []
 
             changes = __salt__["docker.compare_networks"](
