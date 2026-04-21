@@ -515,6 +515,14 @@ def running(name, enable=None, sig=None, init_delay=None, **kwargs):
             ret.update(_enable(name, None, **kwargs))
         elif enable is False and before_toggle_enable_status:
             ret.update(_disable(name, None, **kwargs))
+        # The service was already running, so no restart/reload happened
+        # on this path. If enable toggling produced changes, signal
+        # force_mod_watch so a watched trigger still fires mod_watch
+        # (which performs restart/reload). Without this, a watched
+        # config-file change would be silently dropped whenever
+        # service.running also manages ``enable``.
+        if ret.get("changes") and ret.get("result", True):
+            ret["force_mod_watch"] = True
         return ret
 
     # Run the tests
