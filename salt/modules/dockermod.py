@@ -1342,8 +1342,26 @@ def compare_networks(first, second, ignore="Name,Id,Created,Containers"):
                     def kvsort(x):
                         return (list(x.keys()), list(x.values()))
 
-                    config1 = sorted(val1["Config"], key=kvsort)
-                    config2 = sorted(val2.get("Config", []), key=kvsort)
+                    def normalize_pool(pool):
+                        # Docker's network-inspect output can populate
+                        # per-pool keys (``IPRange``, ``AuxiliaryAddresses``)
+                        # with empty values even when those were not
+                        # explicitly configured. Docker 29 started emitting
+                        # ``IPRange: ""`` despite the struct's ``omitempty``
+                        # tag (see moby/moby#51890, saltstack/salt#68518),
+                        # which caused networks to be recreated on every
+                        # run. Strip falsy values so that Docker's defaults
+                        # do not produce spurious diffs against a pool that
+                        # was created without them.
+                        return {k: v for k, v in pool.items() if v}
+
+                    config1 = sorted(
+                        (normalize_pool(p) for p in val1["Config"]), key=kvsort
+                    )
+                    config2 = sorted(
+                        (normalize_pool(p) for p in val2.get("Config", [])),
+                        key=kvsort,
+                    )
                     if config1 != config2:
                         ret.setdefault("IPAM", {})["Config"] = {
                             "old": config1,
