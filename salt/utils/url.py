@@ -47,7 +47,10 @@ def create(path, saltenv=None):
 
     query = f"saltenv={saltenv}" if saltenv else ""
     url = salt.utils.data.decode(urlunparse(("file", "", path, "", query, "")))
-    return "salt://{}".format(url[len("file:///") :])
+    # Python 3.14 stopped adding the empty "//" authority for relative paths, so the
+    # scheme is followed by "///" only for absolute ones. Strip the scheme and then any
+    # leading slashes to get the path back out.
+    return "salt://{}".format(url[len("file:") :].lstrip("/"))
 
 
 def is_escaped(url):

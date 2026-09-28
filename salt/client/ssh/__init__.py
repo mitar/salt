@@ -1822,7 +1822,10 @@ def mod_data(fsclient):
                         if fn_.endswith((".py", ".so", ".pyx")):
                             full = salt.utils.url.create(fn_)
                             mod_path = fsclient.cache_file(full, env)
-                            if not os.path.isfile(mod_path):
+                            # cache_file returns False when the file cannot be
+                            # fetched, and os.path.isfile(False) stats file
+                            # descriptor 0 instead of a path.
+                            if not mod_path or not os.path.isfile(mod_path):
                                 continue
                             mods_data[os.path.basename(fn_)] = mod_path
                             chunk = salt.utils.hashutils.get_hash(mod_path)

@@ -5,6 +5,7 @@ This module contains the function calls to execute command line scripts
 import contextlib
 import functools
 import logging
+import multiprocessing
 import os
 import signal
 import subprocess
@@ -465,6 +466,12 @@ def salt_ssh():
 
     if "" in sys.path:
         sys.path.remove("")
+    # Salt supports only the "fork" and "spawn" multiprocessing start methods, but
+    # Python 3.14 made "forkserver" the default on Linux. Under "forkserver" process
+    # objects are pickled without their constructor arguments having been captured
+    # (that happens only on spawning platforms), so starting them fails.
+    if multiprocessing.get_start_method(allow_none=False) not in ("fork", "spawn"):
+        multiprocessing.set_start_method("fork", force=True)
     try:
         client = salt.cli.ssh.SaltSSH()
         _install_signal_handlers(client)
